@@ -1,0 +1,26 @@
+[package]
+name = "async-runtime"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mio = { version = "1.0", features = ["os-poll", "net"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
+[[example]]
+name = "echo_server"
+path = "examples/echo_server.rs"
+
+[[example]]
+name = "http_server"
+path = "examples/http_server.rs"
+
+[[example]]
+name = "concurrent_tasks"
+path = "examples/concurrent_tasks.rs"
+
+[[example]]
+name = "benchmark"
+path = "examples/benchmark.rs"
