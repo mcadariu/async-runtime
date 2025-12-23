@@ -3,14 +3,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
 
-/// Sleep for a specified duration.
 pub fn sleep(duration: Duration) -> Sleep {
     Sleep {
         deadline: Instant::now() + duration,
     }
 }
 
-/// A future that completes after a specified time.
 pub struct Sleep {
     deadline: Instant,
 }
@@ -22,7 +20,6 @@ impl Future for Sleep {
         if Instant::now() >= self.deadline {
             Poll::Ready(())
         } else {
-            // Wake the task after the remaining time
             let waker = cx.waker().clone();
             let remaining = self.deadline - Instant::now();
 

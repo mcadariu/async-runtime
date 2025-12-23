@@ -8,12 +8,6 @@ use std::task::{Context, Poll, Waker};
 
 use crate::executor;
 
-//==============================================================================
-// HELPER: Register with Reactor
-//==============================================================================
-
-/// Helper to register or reregister a source with the reactor.
-/// This pattern is used by all I/O operations.
 fn register_with_reactor<S>(
     source: &mut S,
     token_slot: &Mutex<Option<usize>>,
@@ -27,10 +21,8 @@ where
     let mut token = token_slot.lock().unwrap();
 
     if let Some(existing_token) = *token {
-        // Already registered - just update interest
         reactor.reregister(source, existing_token, interest)?;
     } else {
-        // First time - register and save token
         let new_token = reactor.register(source, interest, waker)?;
         *token = Some(new_token);
     }
@@ -38,18 +30,12 @@ where
     Ok(())
 }
 
-//==============================================================================
-// TCP LISTENER
-//==============================================================================
-
-/// Async TCP listener - accepts incoming connections.
 pub struct TcpListener {
     inner: Arc<Mutex<mio::net::TcpListener>>,
     token: Mutex<Option<usize>>,  // Reactor registration token
 }
 
 impl TcpListener {
-    /// Bind to an address.
     pub fn bind(addr: SocketAddr) -> io::Result<Self> {
         let listener = mio::net::TcpListener::bind(addr)?;
         Ok(TcpListener {
@@ -58,7 +44,6 @@ impl TcpListener {
         })
     }
 
-    /// Accept a new incoming connection (returns a Future).
     pub fn accept(&self) -> AcceptFuture<'_> {
         AcceptFuture {
             listener: Arc::clone(&self.inner),
@@ -71,7 +56,6 @@ impl TcpListener {
     }
 }
 
-/// Future that completes when a connection is accepted.
 pub struct AcceptFuture<'a> {
     listener: Arc<Mutex<mio::net::TcpListener>>,
     token: &'a Mutex<Option<usize>>,
@@ -83,10 +67,8 @@ impl<'a> Future for AcceptFuture<'a> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut listener = self.listener.lock().unwrap();
 
-        // Try to accept a connection
         match listener.accept() {
             Ok((stream, addr)) => {
-                // Got a connection!
                 Poll::Ready(Ok((
                     TcpStream {
                         inner: Arc::new(Mutex::new(stream)),
@@ -96,7 +78,6 @@ impl<'a> Future for AcceptFuture<'a> {
                 )))
             }
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                // No connection yet - register to be woken when one arrives
                 register_with_reactor(
                     &mut *listener,
                     self.token,
@@ -111,18 +92,12 @@ impl<'a> Future for AcceptFuture<'a> {
     }
 }
 
-//==============================================================================
-// TCP STREAM
-//==============================================================================
-
-/// Async TCP stream - for reading and writing data.
 pub struct TcpStream {
     inner: Arc<Mutex<mio::net::TcpStream>>,
     token: Mutex<Option<usize>>,  // Reactor registration token
 }
 
 impl TcpStream {
-    /// Connect to a remote address (returns a Future).
     pub fn connect(addr: SocketAddr) -> ConnectFuture {
         ConnectFuture {
             addr,
@@ -131,7 +106,6 @@ impl TcpStream {
         }
     }
 
-    /// Read data into a buffer (returns a Future).
     pub fn read<'a>(&'a self, buf: &'a mut [u8]) -> ReadFuture<'a> {
         ReadFuture {
             stream: Arc::clone(&self.inner),
@@ -140,7 +114,6 @@ impl TcpStream {
         }
     }
 
-    /// Write data from a buffer (returns a Future).
     pub fn write<'a>(&'a self, buf: &'a [u8]) -> WriteFuture<'a> {
         WriteFuture {
             stream: Arc::clone(&self.inner),
@@ -158,11 +131,6 @@ impl TcpStream {
     }
 }
 
-//==============================================================================
-// CONNECT FUTURE
-//==============================================================================
-
-/// Future that completes when a TCP connection is established.
 pub struct ConnectFuture {
     addr: SocketAddr,
     stream: Option<Arc<Mutex<mio::net::TcpStream>>>,
@@ -173,7 +141,6 @@ impl Future for ConnectFuture {
     type Output = io::Result<TcpStream>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // First poll: initiate connection
         if self.stream.is_none() {
             let stream = mio::net::TcpStream::connect(self.addr)?;
             self.stream = Some(Arc::new(Mutex::new(stream)));
@@ -182,7 +149,6 @@ impl Future for ConnectFuture {
         let stream = Arc::clone(self.stream.as_ref().unwrap());
         let mut stream_guard = stream.lock().unwrap();
 
-        // Check if connection is complete
         match stream_guard.peer_addr() {
             Ok(_) => {
                 // Connected!
@@ -193,7 +159,6 @@ impl Future for ConnectFuture {
                 }))
             }
             Err(ref e) if e.kind() == io::ErrorKind::NotConnected => {
-                // Still connecting - register to be woken when ready
                 let token_slot = Mutex::new(self.token);
                 register_with_reactor(
                     &mut *stream_guard,
@@ -210,11 +175,6 @@ impl Future for ConnectFuture {
     }
 }
 
-//==============================================================================
-// READ FUTURE
-//==============================================================================
-
-/// Future that completes when data is read from a stream.
 pub struct ReadFuture<'a> {
     stream: Arc<Mutex<mio::net::TcpStream>>,
     token: &'a Mutex<Option<usize>>,
@@ -225,16 +185,12 @@ impl<'a> Future for ReadFuture<'a> {
     type Output = io::Result<usize>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // SAFETY: We need &mut to the buffer, but Pin prevents us from getting it normally.
-        // This is safe because we're not moving the Future itself.
         let this = unsafe { self.as_mut().get_unchecked_mut() };
         let mut stream = this.stream.lock().unwrap();
 
-        // Try to read
         match stream.read(this.buf) {
             Ok(n) => Poll::Ready(Ok(n)),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                // No data yet - register to be woken when data arrives
                 register_with_reactor(
                     &mut *stream,
                     this.token,
@@ -249,11 +205,6 @@ impl<'a> Future for ReadFuture<'a> {
     }
 }
 
-//==============================================================================
-// WRITE FUTURE
-//==============================================================================
-
-/// Future that completes when data is written to a stream.
 pub struct WriteFuture<'a> {
     stream: Arc<Mutex<mio::net::TcpStream>>,
     token: &'a Mutex<Option<usize>>,
@@ -266,11 +217,9 @@ impl<'a> Future for WriteFuture<'a> {
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut stream = self.stream.lock().unwrap();
 
-        // Try to write
         match stream.write(self.buf) {
             Ok(n) => Poll::Ready(Ok(n)),
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                // Can't write yet - register to be woken when ready
                 register_with_reactor(
                     &mut *stream,
                     self.token,
