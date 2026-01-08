@@ -17,17 +17,14 @@ fn main() -> io::Result<()> {
                 Ok((stream, addr)) => {
                     println!("Accepted connection from {}", addr);
 
-                    // Spawn a task to handle this connection
                     spawn(async move {
                         let mut buf = vec![0u8; 4096];
 
-                        // Read the HTTP request
                         match stream.read(&mut buf).await {
                             Ok(n) if n > 0 => {
                                 let request = String::from_utf8_lossy(&buf[..n]);
                                 println!("Request:\n{}", request.lines().next().unwrap_or(""));
 
-                                // Simple HTTP response
                                 let response = concat!(
                                     "HTTP/1.1 200 OK\r\n",
                                     "Content-Type: text/html; charset=utf-8\r\n",

@@ -11,7 +11,6 @@ fn benchmark_task_spawning() {
     println!("1. Task Spawning Throughput");
     println!("----------------------------");
 
-    // Our runtime
     {
         let rt = async_runtime::Runtime::new();
         let start = Instant::now();
@@ -20,11 +19,9 @@ fn benchmark_task_spawning() {
         rt.block_on(async move {
             for _ in 0..num_tasks {
                 async_runtime::spawn(async {
-                    // Minimal work
                 });
             }
 
-            // Wait for tasks to complete
             async_runtime::sleep(Duration::from_millis(100)).await;
         });
 
@@ -37,7 +34,6 @@ fn benchmark_task_spawning() {
         );
     }
 
-    // Tokio runtime
     {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let start = Instant::now();
@@ -46,11 +42,9 @@ fn benchmark_task_spawning() {
         rt.block_on(async {
             for _ in 0..num_tasks {
                 tokio::spawn(async {
-                    // Minimal work
                 });
             }
 
-            // Wait for tasks to complete
             tokio::time::sleep(Duration::from_millis(100)).await;
         });
 
@@ -70,13 +64,11 @@ fn benchmark_sleep_performance() {
     println!("2. Sleep/Timer Performance");
     println!("--------------------------");
 
-    // Our runtime
     {
         let rt = async_runtime::Runtime::new();
         let start = Instant::now();
 
         rt.block_on(async {
-            // Sleep 10 times for 10ms each
             for _ in 0..10 {
                 async_runtime::sleep(Duration::from_millis(10)).await;
             }
@@ -86,13 +78,11 @@ fn benchmark_sleep_performance() {
         println!("  async-runtime: 10x 10ms sleeps took {:?}", elapsed);
     }
 
-    // Tokio runtime
     {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let start = Instant::now();
 
         rt.block_on(async {
-            // Sleep 10 times for 10ms each
             for _ in 0..10 {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }

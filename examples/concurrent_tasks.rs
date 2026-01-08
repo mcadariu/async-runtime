@@ -9,7 +9,6 @@ fn main() {
     rt.block_on(async {
         println!("Spawning 10 concurrent tasks...\n");
 
-        // Spawn 10 tasks that run concurrently
         for i in 0..10 {
             spawn(async move {
                 println!("Task {} starting", i);
@@ -18,7 +17,6 @@ fn main() {
             });
         }
 
-        // Give tasks time to complete
         sleep(Duration::from_secs(2)).await;
 
         println!("\nAll tasks completed!");

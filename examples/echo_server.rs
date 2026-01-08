@@ -17,7 +17,6 @@ fn main() -> io::Result<()> {
                 Ok((stream, addr)) => {
                     println!("Accepted connection from {}", addr);
 
-                    // Spawn a task to handle this connection
                     spawn(async move {
                         let mut buf = vec![0u8; 1024];
 
@@ -30,7 +29,6 @@ fn main() -> io::Result<()> {
                                 Ok(n) => {
                                     println!("Received {} bytes from {}", n, addr);
 
-                                    // Echo back
                                     if let Err(e) = stream.write(&buf[..n]).await {
                                         eprintln!("Write error: {}", e);
                                         break;

@@ -19,7 +19,6 @@ unsafe fn clone_waker(data: *const ()) -> RawWaker {
 
 unsafe fn wake(data: *const ()) {
     let task = Arc::from_raw(data as *const Task);
-    // Re-enqueue the task
     crate::executor::enqueue(task);
 }
 

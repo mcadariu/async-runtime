@@ -32,7 +32,7 @@ where
 
 pub struct TcpListener {
     inner: Arc<Mutex<mio::net::TcpListener>>,
-    token: Mutex<Option<usize>>,  // Reactor registration token
+    token: Mutex<Option<usize>>,
 }
 
 impl TcpListener {
@@ -94,7 +94,7 @@ impl<'a> Future for AcceptFuture<'a> {
 
 pub struct TcpStream {
     inner: Arc<Mutex<mio::net::TcpStream>>,
-    token: Mutex<Option<usize>>,  // Reactor registration token
+    token: Mutex<Option<usize>>,
 }
 
 impl TcpStream {
@@ -151,7 +151,6 @@ impl Future for ConnectFuture {
 
         match stream_guard.peer_addr() {
             Ok(_) => {
-                // Connected!
                 drop(stream_guard);
                 Poll::Ready(Ok(TcpStream {
                     inner: stream,
